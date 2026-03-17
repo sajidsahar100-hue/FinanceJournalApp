@@ -60,6 +60,5 @@ dependencies {
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
     // Apache POI for Excel (3.17 best Android compatibility)
-    implementation 'org.apache.poi:poi:3.17'
     debugImplementation 'androidx.compose.ui:ui-tooling'
 }
