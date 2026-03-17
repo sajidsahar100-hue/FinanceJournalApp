@@ -3,6 +3,7 @@ package com.financeapp.utils
 import android.content.Context
 import com.financeapp.data.JournalEntry
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
+import org.apache.poi.ss.usermodel.CellStyle
 import org.apache.poi.ss.usermodel.FillPatternType
 import org.apache.poi.ss.usermodel.IndexedColors
 import java.io.File
@@ -16,78 +17,83 @@ object ExcelExporter {
         val wb    = HSSFWorkbook()
         val sheet = wb.createSheet(title.take(30))
 
-        val headerFont = wb.createFont().apply {
-            bold = true; color = IndexedColors.WHITE.index
-        }
-        val headerStyle = wb.createCellStyle().apply {
-            fillForegroundColor = IndexedColors.DARK_GREEN.index
-            fillPattern = FillPatternType.SOLID_FOREGROUND
-            setFont(headerFont)
-        }
-        val creditStyle = wb.createCellStyle().apply {
-            val f = wb.createFont().apply { color = IndexedColors.GREEN.index }
-            setFont(f)
-        }
-        val debitStyle = wb.createCellStyle().apply {
-            val f = wb.createFont().apply { color = IndexedColors.RED.index }
-            setFont(f)
-        }
-        val boldStyle = wb.createCellStyle().apply {
-            val f = wb.createFont().apply { bold = true }
-            setFont(f)
-        }
+        // Header style
+        val headerFont = wb.createFont()
+        headerFont.bold = true
+        headerFont.color = IndexedColors.WHITE.index
+        val headerStyle: CellStyle = wb.createCellStyle()
+        headerStyle.fillForegroundColor = IndexedColors.DARK_GREEN.index
+        headerStyle.fillPattern = FillPatternType.SOLID_FOREGROUND
+        headerStyle.setFont(headerFont)
+
+        // Credit style
+        val creditFont = wb.createFont()
+        creditFont.color = IndexedColors.GREEN.index
+        val creditStyle: CellStyle = wb.createCellStyle()
+        creditStyle.setFont(creditFont)
+
+        // Debit style
+        val debitFont = wb.createFont()
+        debitFont.color = IndexedColors.RED.index
+        val debitStyle: CellStyle = wb.createCellStyle()
+        debitStyle.setFont(debitFont)
+
+        // Bold style
+        val boldFont = wb.createFont()
+        boldFont.bold = true
+        val boldStyle: CellStyle = wb.createCellStyle()
+        boldStyle.setFont(boldFont)
 
         // Header row
         val headers = listOf("No.", "Date", "Details", "Amount", "Type", "Vendor")
-        sheet.createRow(0).also { row ->
-            headers.forEachIndexed { i, h ->
-                row.createCell(i).apply { setCellValue(h); cellStyle = headerStyle }
-            }
+        val headerRow = sheet.createRow(0)
+        headers.forEachIndexed { i, h ->
+            val cell = headerRow.createCell(i)
+            cell.setCellValue(h)
+            cell.cellStyle = headerStyle
         }
 
         // Data rows
         entries.forEachIndexed { idx, e ->
-            sheet.createRow(idx + 1).also { row ->
-                row.createCell(0).setCellValue((idx + 1).toDouble())
-                row.createCell(1).setCellValue(e.date)
-                row.createCell(2).setCellValue(e.details)
-                row.createCell(3).apply {
-                    setCellValue(e.amount)
-                    cellStyle = if (e.type == "CREDIT") creditStyle else debitStyle
-                }
-                row.createCell(4).apply {
-                    setCellValue(e.type)
-                    cellStyle = if (e.type == "CREDIT") creditStyle else debitStyle
-                }
-                row.createCell(5).setCellValue(e.vendorName ?: "-")
-            }
+            val row = sheet.createRow(idx + 1)
+            row.createCell(0).setCellValue((idx + 1).toDouble())
+            row.createCell(1).setCellValue(e.date)
+            row.createCell(2).setCellValue(e.details)
+            val amtCell = row.createCell(3)
+            amtCell.setCellValue(e.amount)
+            amtCell.cellStyle = if (e.type == "CREDIT") creditStyle else debitStyle
+            val typeCell = row.createCell(4)
+            typeCell.setCellValue(e.type)
+            typeCell.cellStyle = if (e.type == "CREDIT") creditStyle else debitStyle
+            row.createCell(5).setCellValue(e.vendorName ?: "-")
         }
 
-        // Auto-size
+        // Auto-size columns
         (0..5).forEach { sheet.autoSizeColumn(it) }
 
-        // Summary block
+        // Summary
         val offset = entries.size + 2
         val totalCredit = entries.filter { it.type == "CREDIT" }.sumOf { it.amount }
         val totalDebit  = entries.filter { it.type == "DEBIT"  }.sumOf { it.amount }
         val balance     = totalCredit - totalDebit
 
-        mapOf(
-            offset     to Pair("Total Credit:", totalCredit),
-            offset + 1 to Pair("Total Debit:",  totalDebit),
-            offset + 2 to Pair("Net Balance:",  balance)
-        ).forEach { (rowIdx, pair) ->
-            sheet.createRow(rowIdx).also { row ->
-                row.createCell(0).apply { setCellValue(pair.first); cellStyle = boldStyle }
-                row.createCell(1).apply {
-                    setCellValue(pair.second)
-                    cellStyle = when {
-                        rowIdx == offset     -> creditStyle
-                        rowIdx == offset + 1 -> debitStyle
-                        pair.second >= 0     -> creditStyle
-                        else                 -> debitStyle
-                    }
-                }
+        val summaryData = listOf(
+            Pair("Total Credit:", totalCredit),
+            Pair("Total Debit:",  totalDebit),
+            Pair("Net Balance:",  balance)
+        )
+        summaryData.forEachIndexed { i, pair ->
+            val row = sheet.createRow(offset + i)
+            val labelCell = row.createCell(0)
+            labelCell.setCellValue(pair.first)
+            labelCell.cellStyle = boldStyle
+            val valCell = row.createCell(1)
+            valCell.setCellValue(pair.second)
+            valCell.cellStyle = when {
+                i == 0 -> creditStyle
+                i == 1 -> debitStyle
+                pair.second >= 0 -> creditStyle
+                else -> debitStyle
             }
         }
 
